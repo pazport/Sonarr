@@ -145,8 +145,9 @@ namespace NzbDrone.Core.History
 
             pagingSpec.Records = GetPagedRecords(PagedBuilder(languages, qualities, sortingByQuality), pagingSpec, PagedQuery, customSortExpression);
 
-            var countTemplate = $"SELECT COUNT(*) FROM (SELECT /**select**/ FROM \"{TableMapping.Mapper.TableNameMapping(typeof(EpisodeHistory))}\" /**join**/ /**innerjoin**/ /**leftjoin**/ /**where**/ /**groupby**/ /**having**/) AS \"Inner\"";
-            pagingSpec.TotalRecords = GetPagedRecordCount(PagedBuilder(languages, qualities, sortingByQuality).Select(typeof(EpisodeHistory)), pagingSpec, countTemplate);
+            // All filters are on History's own columns and orphaned history is removed by housekeeping,
+            // so count without joining Series and Episodes, which is much faster on large history tables.
+            pagingSpec.TotalRecords = GetPagedRecordCount(AddWhereClauses(Builder(), languages, qualities).SelectCount(), pagingSpec);
 
             return pagingSpec;
         }
@@ -169,6 +170,11 @@ namespace NzbDrone.Core.History
                     $"AND \"r\".\"QualityId\" = {qualityIdExpr}");
             }
 
+            return AddWhereClauses(builder, languages, qualities);
+        }
+
+        private SqlBuilder AddWhereClauses(SqlBuilder builder, int[] languages, int[] qualities)
+        {
             if (languages is { Length: > 0 })
             {
                 builder.Where($"({BuildLanguageWhereClause(languages)})");
