@@ -3,6 +3,7 @@ using System.Linq;
 using FizzWare.NBuilder;
 using FluentAssertions;
 using NUnit.Framework;
+using NzbDrone.Core.Datastore;
 using NzbDrone.Core.History;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.Qualities;
@@ -95,6 +96,56 @@ namespace NzbDrone.Core.Test.HistoryTests
 
             removedItems.Should().HaveCount(0);
             nonRemovedItems.Should().HaveCount(1);
+        }
+
+        [Test]
+        public void should_get_paged_history_with_total_count_matching_filters()
+        {
+            var series = Builder<Series>.CreateNew()
+                                        .With(s => s.Id = 0)
+                                        .With(s => s.QualityProfileId = 1)
+                                        .Build();
+
+            series.Id = Db.Insert(series).Id;
+
+            var episode = Builder<Episode>.CreateNew()
+                                          .With(e => e.Id = 0)
+                                          .With(e => e.SeriesId = series.Id)
+                                          .Build();
+
+            episode.Id = Db.Insert(episode).Id;
+
+            var items = Builder<EpisodeHistory>.CreateListOfSize(5)
+                .All()
+                .With(c => c.Id = 0)
+                .With(c => c.SeriesId = series.Id)
+                .With(c => c.EpisodeId = episode.Id)
+                .With(c => c.Quality = new QualityModel(Quality.Bluray1080p))
+                .With(c => c.Languages = new List<Language> { Language.English })
+                .With(c => c.EventType = EpisodeHistoryEventType.Grabbed)
+                .TheFirst(2)
+                .With(c => c.EventType = EpisodeHistoryEventType.DownloadFolderImported)
+                .TheLast(1)
+                .With(c => c.Quality = new QualityModel(Quality.DVD))
+                .BuildListOfNew();
+
+            Db.InsertMany(items);
+
+            var pagingSpec = new PagingSpec<EpisodeHistory>
+            {
+                Page = 1,
+                PageSize = 2,
+                SortKey = "date",
+                SortDirection = SortDirection.Descending
+            };
+
+            pagingSpec.FilterExpressions.Add(h => h.EventType == EpisodeHistoryEventType.Grabbed);
+
+            var result = Subject.GetPaged(pagingSpec, null, new[] { Quality.Bluray1080p.Id });
+
+            result.TotalRecords.Should().Be(2);
+            result.Records.Should().HaveCount(2);
+            result.Records.Should().OnlyContain(h => h.Series != null && h.Episode != null);
         }
     }
 }
