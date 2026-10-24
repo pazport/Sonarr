@@ -7,6 +7,7 @@ using NUnit.Framework;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Test.Framework;
+using NzbDrone.Test.Common;
 
 namespace NzbDrone.Core.Test.Messaging.Commands
 {
@@ -55,6 +56,32 @@ namespace NzbDrone.Core.Test.Messaging.Commands
 
             Mocker.GetMock<ICommandRepository>()
                   .Verify(v => v.Get(It.IsAny<int>()), Times.Never());
+        }
+
+        [Test]
+        public void should_warn_when_command_has_been_running_longer_than_threshold()
+        {
+            var command = Subject.Push<ProcessMonitoredDownloadsCommand>(new ProcessMonitoredDownloadsCommand());
+
+            command.StartedAt = DateTime.UtcNow.AddMinutes(-31);
+            command.Status = CommandStatus.Started;
+
+            Subject.CleanCommands();
+
+            ExceptionVerification.ExpectedWarns(1);
+        }
+
+        [Test]
+        public void should_not_warn_when_command_has_been_running_shorter_than_threshold()
+        {
+            var command = Subject.Push<ProcessMonitoredDownloadsCommand>(new ProcessMonitoredDownloadsCommand());
+
+            command.StartedAt = DateTime.UtcNow.AddMinutes(-29);
+            command.Status = CommandStatus.Started;
+
+            Subject.CleanCommands();
+
+            ExceptionVerification.ExpectedWarns(0);
         }
     }
 }

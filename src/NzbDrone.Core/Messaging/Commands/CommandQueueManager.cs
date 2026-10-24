@@ -37,6 +37,8 @@ namespace NzbDrone.Core.Messaging.Commands
 
     public class CommandQueueManager : IManageCommandQueue, IHandle<ApplicationStartedEvent>
     {
+        private static readonly TimeSpan LongRunningWarningThreshold = TimeSpan.FromMinutes(30);
+
         private readonly ICommandRepository _repo;
         private readonly KnownTypes _knownTypes;
         private readonly Logger _logger;
@@ -243,6 +245,22 @@ namespace NzbDrone.Core.Messaging.Commands
             _commandQueue.RemoveMany(commands);
 
             _repo.Trim();
+
+            WarnLongRunningCommands();
+        }
+
+        private void WarnLongRunningCommands()
+        {
+            var now = DateTime.UtcNow;
+
+            var commands = _commandQueue.All()
+                                        .Where(c => c.Status == CommandStatus.Started && c.StartedAt < now.Subtract(LongRunningWarningThreshold))
+                                        .ToList();
+
+            foreach (var command in commands)
+            {
+                _logger.Warn("Task '{0}' has been running for {1:0} minutes and may be stuck, a restart is required to stop it", command.Name, now.Subtract(command.StartedAt.Value).TotalMinutes);
+            }
         }
 
         private Command GetCommand(string commandName)
