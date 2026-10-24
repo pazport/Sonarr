@@ -37,6 +37,8 @@ namespace NzbDrone.Core.Messaging.Commands
 
     public class CommandQueueManager : IManageCommandQueue, IHandle<ApplicationStartedEvent>
     {
+        private static readonly TimeSpan LongRunningThreshold = TimeSpan.FromMinutes(5);
+
         private readonly ICommandRepository _repo;
         private readonly KnownTypes _knownTypes;
         private readonly Logger _logger;
@@ -243,6 +245,22 @@ namespace NzbDrone.Core.Messaging.Commands
             _commandQueue.RemoveMany(commands);
 
             _repo.Trim();
+
+            LogLongRunningCommands();
+        }
+
+        private void LogLongRunningCommands()
+        {
+            var now = DateTime.UtcNow;
+
+            var commands = _commandQueue.All()
+                                        .Where(c => c.Status == CommandStatus.Started && c.StartedAt < now.Subtract(LongRunningThreshold))
+                                        .ToList();
+
+            foreach (var command in commands)
+            {
+                _logger.Error("Task '{0}' has been running for {1:0} minutes and may be stuck, a restart is required to stop it", command.Name, now.Subtract(command.StartedAt.Value).TotalMinutes);
+            }
         }
 
         private Command GetCommand(string commandName)
@@ -275,6 +293,11 @@ namespace NzbDrone.Core.Messaging.Commands
 
         public void Handle(ApplicationStartedEvent message)
         {
+            foreach (var command in _repo.Started())
+            {
+                _logger.Error("Task '{0}' was still running when Sonarr stopped and has been orphaned", command.Name);
+            }
+
             _logger.Trace("Orphaning incomplete commands");
             _repo.OrphanStarted();
             Requeue();

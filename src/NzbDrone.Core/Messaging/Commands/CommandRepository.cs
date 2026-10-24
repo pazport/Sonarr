@@ -11,6 +11,7 @@ namespace NzbDrone.Core.Messaging.Commands
         void Trim();
         void OrphanStarted();
         List<CommandModel> Queued();
+        List<CommandModel> Started();
         void Start(CommandModel command);
         void End(CommandModel command);
     }
@@ -48,6 +49,11 @@ namespace NzbDrone.Core.Messaging.Commands
         public List<CommandModel> Queued()
         {
             return Query(x => x.Status == CommandStatus.Queued);
+        }
+
+        public List<CommandModel> Started()
+        {
+            return Query(x => x.Status == CommandStatus.Started);
         }
 
         public void Start(CommandModel command)

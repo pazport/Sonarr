@@ -5,8 +5,10 @@ using FluentAssertions;
 using Moq;
 using NUnit.Framework;
 using NzbDrone.Core.Download;
+using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Test.Framework;
+using NzbDrone.Test.Common;
 
 namespace NzbDrone.Core.Test.Messaging.Commands
 {
@@ -55,6 +57,54 @@ namespace NzbDrone.Core.Test.Messaging.Commands
 
             Mocker.GetMock<ICommandRepository>()
                   .Verify(v => v.Get(It.IsAny<int>()), Times.Never());
+        }
+
+        [Test]
+        public void should_log_error_when_command_has_been_running_longer_than_threshold()
+        {
+            var command = Subject.Push<ProcessMonitoredDownloadsCommand>(new ProcessMonitoredDownloadsCommand());
+
+            command.StartedAt = DateTime.UtcNow.AddMinutes(-6);
+            command.Status = CommandStatus.Started;
+
+            Subject.CleanCommands();
+
+            ExceptionVerification.ExpectedErrors(1);
+        }
+
+        [Test]
+        public void should_not_log_error_when_command_has_been_running_shorter_than_threshold()
+        {
+            var command = Subject.Push<ProcessMonitoredDownloadsCommand>(new ProcessMonitoredDownloadsCommand());
+
+            command.StartedAt = DateTime.UtcNow.AddMinutes(-4);
+            command.Status = CommandStatus.Started;
+
+            Subject.CleanCommands();
+
+            ExceptionVerification.ExpectedErrors(0);
+        }
+
+        [Test]
+        public void should_log_error_for_commands_orphaned_on_startup()
+        {
+            Mocker.GetMock<ICommandRepository>()
+                  .Setup(s => s.Started())
+                  .Returns(new List<CommandModel>
+                  {
+                      new CommandModel { Name = "ProcessMonitoredDownloads", Status = CommandStatus.Started }
+                  });
+
+            Mocker.GetMock<ICommandRepository>()
+                  .Setup(s => s.Queued())
+                  .Returns(new List<CommandModel>());
+
+            Subject.Handle(new ApplicationStartedEvent());
+
+            ExceptionVerification.ExpectedErrors(1);
+
+            Mocker.GetMock<ICommandRepository>()
+                  .Verify(v => v.OrphanStarted(), Times.Once());
         }
     }
 }

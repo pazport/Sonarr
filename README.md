@@ -42,6 +42,23 @@ Note: GitHub Issues are for Bugs and Feature Requests Only
 - Full support for specials and multi-episode releases
 - And a beautiful UI
 
+## Stuck Task Watchdog
+
+`scripts/sonarr-pmd-watchdog.sh` restarts Sonarr when the Process Monitored Downloads task has been running for longer than `MAX_MINUTES`, then queues the task again. It requires `curl` and `jq`.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `SONARR_URL` | `http://localhost:8989` | Sonarr base URL |
+| `SONARR_API_KEY` | _(required)_ | API key from Settings > General |
+| `MAX_MINUTES` | `5` | Minutes the task can run before Sonarr is restarted |
+| `WAIT_SECONDS` | `10` | Seconds between checks while waiting for Sonarr to restart |
+
+Run it from cron every minute:
+
+```
+* * * * * SONARR_URL=http://localhost:8989 SONARR_API_KEY=yourkey MAX_MINUTES=10 /path/to/scripts/sonarr-pmd-watchdog.sh >> /var/log/sonarr-watchdog.log 2>&1
+```
+
 ## Contributing
 
 ### Development
