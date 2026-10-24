@@ -2,14 +2,14 @@
 # Restarts Sonarr if "Process Monitored Downloads" has been running too long,
 # then re-triggers download processing. Needs curl and jq.
 #
-# Run from cron, e.g. every 5 minutes:
-#   */5 * * * * SONARR_URL=http://localhost:8989 SONARR_API_KEY=xxx /path/to/sonarr-pmd-watchdog.sh
+# Run from cron, e.g. every minute:
+#   * * * * * SONARR_URL=http://localhost:8989 SONARR_API_KEY=xxx /path/to/sonarr-pmd-watchdog.sh
 
 set -euo pipefail
 
 SONARR_URL="${SONARR_URL:-http://localhost:8989}"
 SONARR_API_KEY="${SONARR_API_KEY:?set SONARR_API_KEY}"
-MAX_MINUTES="${MAX_MINUTES:-30}"
+MAX_MINUTES="${MAX_MINUTES:-5}"
 WAIT_SECONDS="${WAIT_SECONDS:-10}"
 
 api() {
@@ -30,7 +30,7 @@ fi
 echo "$(date -Is) ProcessMonitoredDownloads stuck (id/started: $stuck), restarting Sonarr"
 
 # A running command can't be cancelled through the API, so restart Sonarr.
-# On startup Sonarr marks the stuck command as orphaned.
+# On startup Sonarr marks the stuck command as orphaned and logs an error.
 api -X POST "$SONARR_URL/api/v3/system/restart" > /dev/null
 
 # Wait for Sonarr to come back up
