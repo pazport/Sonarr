@@ -42,6 +42,17 @@ Note: GitHub Issues are for Bugs and Feature Requests Only
 - Full support for specials and multi-episode releases
 - And a beautiful UI
 
+## Building with Docker
+
+The `Dockerfile` builds the frontend and backend from source and produces an image that runs Sonarr:
+
+```
+docker build -t sonarr .
+docker run -d --name sonarr --restart unless-stopped -p 8989:8989 -v /path/to/config:/config -v /path/to/tv:/tv -v /path/to/downloads:/downloads sonarr
+```
+
+Sonarr runs as a non-root user (UID 1654), so the mounted folders must be writable by that user, e.g. `sudo chown -R 1654:1654 /path/to/config`.
+
 ## Stuck Task Watchdog
 
 `scripts/sonarr-pmd-watchdog.sh` restarts Sonarr when the Process Monitored Downloads task has been running for longer than `MAX_MINUTES`, then queues the task again. It requires `curl` and `jq`.
